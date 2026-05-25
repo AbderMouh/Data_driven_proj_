@@ -10,7 +10,7 @@ from scipy.interpolate import interp1d
 
 # --- SCENARIO A: Your CSV has two columns: [time, q_in] ---
 df = pd.read_csv('./Real_data/dataBenchmark.csv') # je vole l'input du real dataset >:D
-q_data = df['uEst'].values  # Pour avoir des valeur realiste en m3/s vu que de base c est en volt
+q_data = df['uEst'].values * 0.001  # Pour avoir des valeur realiste en m3/s vu que de base c est en volt
 dt = 4/1024                                            # Adjust this to your actual time increment
 t_data = np.arange(len(q_data)) * dt                 # Creates time array from 0 to 102.3 seconds
 
@@ -27,8 +27,8 @@ q_in_lookup = interp1d(t_data, q_data, kind='linear', bounds_error=False, fill_v
 # =====================================================================
 # 2. Define System Parameters and Differential Equation
 # =====================================================================
-S = 0.005 # rayon de 4 cm
-c = 10  # Valve/discharge constant
+S = 0.005 # surface de rayon 4 cm +-
+c = 0.012 # Valve/discharge constant
 h0 = 0.1   # Initial tank height at t = 0
 
 def tank_system(t, h):
