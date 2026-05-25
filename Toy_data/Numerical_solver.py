@@ -60,11 +60,11 @@ solution = solve_ivp(tank_system, t_span, [h0], t_eval=t_eval)
 # solution.t contains the timestamps; solution.y[0] contains the calculated h(t) values
 results_data = {
     'time': solution.t,
+    'q_in': q_in_lookup(solution.t),  
     'h_predicted': solution.y[0]
 }
 
-# 2. (Optional) If you want to include the input flow rate q_in at those exact timestamps
-results_data['q_in'] = q_in_lookup(solution.t)
+
 
 # 3. Convert the dictionary into a Pandas DataFrame
 df_results = pd.DataFrame(results_data)
