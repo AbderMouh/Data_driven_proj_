@@ -15,7 +15,7 @@ dt = 4/1024                                            # Adjust this to your act
 t_data = np.arange(len(q_data)) * dt                 # Creates time array from 0 to 102.3 seconds
 
 
-# --- SCENARIO B: Your CSV is just 1 column of 1024 values with a fixed time-step (e.g., dt = 0.1s) ---
+
 
 
 
@@ -60,8 +60,9 @@ solution = solve_ivp(tank_system, t_span, [h0], t_eval=t_eval)
 # solution.t contains the timestamps; solution.y[0] contains the calculated h(t) values
 results_data = {
     'time': solution.t,
-    'q_in': q_in_lookup(solution.t),  
-    'h_predicted': solution.y[0]
+    'u1': q_in_lookup(solution.t),  
+    'y1': solution.y[0]
+
 }
 
 
