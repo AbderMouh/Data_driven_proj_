@@ -29,7 +29,7 @@ q_in_lookup = interp1d(t_data, q_data, kind='linear', bounds_error=False, fill_v
 # =====================================================================
 S = 0.005 # surface de rayon 4 cm +-
 c = 0.012 # Valve/discharge constant
-h0 = 0.1   # Initial tank height at t = 0
+h0 = 0.05   # Initial tank height at t = 0
 
 def tank_system(t, h):
     h_val = max(h[0], 0.0)  # Safeguard against negative heights due to numerical overshoot
@@ -53,7 +53,18 @@ t_eval = np.linspace(t_data[0], t_data[-1], 1000) # 1000 points for a smooth plo
 solution = solve_ivp(tank_system, t_span, [h0], t_eval=t_eval)
 
 
+#scale c l incertitude, jai mis 1 mm
+noise = np.random.normal(loc=0, scale=0.001, size=solution.y[0].shape)
 
+
+solution.y[0] = solution.y[0] + noise
+
+#u(t-1) et y(t-1)
+u2 = np.hstack([0,q_in_lookup(solution.t)])
+u2 = np.delete(u2,-1)
+
+y2 = np.hstack([0,solution.y[0]])
+y2 = np.delete(y2,-1)
 
 
 # 1. Gather the solved time values and the corresponding calculated heights
@@ -61,7 +72,9 @@ solution = solve_ivp(tank_system, t_span, [h0], t_eval=t_eval)
 results_data = {
     'time': solution.t,
     'u1': q_in_lookup(solution.t),  
-    'y1': solution.y[0]
+    'y1': solution.y[0],
+    'u2': u2,
+    'y2' : y2
 
 }
 
