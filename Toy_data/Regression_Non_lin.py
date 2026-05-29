@@ -12,7 +12,9 @@ t = df['time'].values
 u0 = df['u1'].values 
 y0 = df['y1'].values
 y_no_noise = df['y_no_noise'].values
-# Define the maximum number of lags to generate (Set to 6)
+
+
+# Define the maximum number of lags to generate 
 max_lags = 25
 
 # Lists to hold your lagged arrays dynamically
@@ -91,10 +93,6 @@ for lags in range(1, max_lags + 1):
     rmse_val = np.sqrt(mean_squared_error(Y_val, preds_val))
     rmse.append(rmse_val)
     r2_val = r2_score(Y_val, preds_val)
-
-
-
-
 
 
 
