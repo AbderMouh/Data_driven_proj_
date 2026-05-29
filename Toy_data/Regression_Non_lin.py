@@ -6,12 +6,6 @@ from sklearn.metrics import mean_squared_error, r2_score
 
 
 
-# This script deos the same thing as the no loop script it s just that here we can loop through multiple lags instead of adding it manually (thanks gemini)
-# So here we show that after a certain number of linear combination of lags the RMSE value doesnt change anymore.
-# after 4 lag it doesnt change much for the validation set. we also see that more lags makes the model more robust too noise (idk why)
-# infact even with a very noisy set after 15-20 lags we can retrieve really well the initial curve (the one without noise)
-
-
 df = pd.read_csv('./Toy_data/numerical_res.csv')
 
 t = df['time'].values
@@ -25,20 +19,21 @@ max_lags = 25
 y_lags = []
 u_lags = []
 
-current_y = y0
-current_u = u0
-
-for i in range(max_lags):
-    current_y = np.hstack([current_y[0], current_y])[:-1]
-    y_lags.append(current_y)
-    
-    current_u = np.hstack([current_u[0], current_u])[:-1]
-    u_lags.append(current_u)
-
 # Half-splits for training and validation
 y0_red = len(y0) // 2
 Y_fit = y0[0:y0_red]
 Y_val = y0[y0_red:]
+
+# So we shift by one add the initial value as the first value and then remove the las value to keep the same dimensions
+for i in range(1,max_lags+1):
+
+     
+    y_lags.append(np.hstack([np.ones(i)*y0[0], y0[:-i]]))
+    
+     
+    u_lags.append(np.hstack([np.ones(i)*u0[0], u0[:-i]]))
+
+
 
 # Slice validation inputs for recursive simulation loops
 u_val_matrix = np.column_stack([u[y0_red:] for u in u_lags])
@@ -57,7 +52,7 @@ for lags in range(1, max_lags + 1):
     # Generate the square root transformation ONLY for the first lag of y (y1)
     y1_fit = y_cols[0]
     u1_fit = u_cols[0]
-    y1_sqrt_col = [ abs(y1_fit)**(1/2)]
+    y1_sqrt_col = [abs(y1_fit)**(1/2)]
     
     # Combine original features and ONLY the single square root feature of y1
     phi_fit = np.column_stack(y_cols + u_cols + y1_sqrt_col)
@@ -72,28 +67,39 @@ for lags in range(1, max_lags + 1):
     
     # 4. Validation Phase Recursive Simulation Loop
     preds_val = np.zeros(len(Y_val))
-    preds_val[0:lags] = Y_val[0:lags] # Seed the loop with real initial history
     
-    for k in range(lags, len(Y_val)):
-        # Extract past outputs (from our own predictions)
-        y_features = [preds_val[k - i] for i in range(1, lags + 1)]
-        # Extract past inputs (from validation matrix)
-        u_features = [u_val_matrix[k, i] for i in range(lags)]
+
+    for k in range(0, len(Y_val)):
+    
+        # Extract past outputs: if k - i < 0, it means it's before the start, so use Y_val[0]
+        y_features = [preds_val[k - i] if (k - i) >= 0 else Y_val[0] for i in range(1, lags + 1)]
         
-        # Apply the square root ONLY to the first element of y_features, which is preds_val[k-1]
+        # Extract past inputs: do the same zero-padding if the index is out of bounds
+        u_features = [u_val_matrix[k, i] for i in range(lags)] 
+
         y1_val_current = y_features[0]
         y1_sqrt_feature = [np.sign(y1_val_current) * np.sqrt(np.abs(y1_val_current))]
+
+        # Combine into your final row vector [y_linear, u_linear, sqrt(y1)]
+        Xk = np.array([y_features + u_features +y1_sqrt_feature ])
         
-        # Structure the row vector to match phi_fit exactly: [all_y_linear, all_u_linear, sqrt(y1)]
-        Xk = np.array([y_features + u_features + y1_sqrt_feature])
+        # Predict step k
         preds_val[k] = model.predict(Xk)[0]
-        
+
+
     # 5. Evaluation metrics accumulation
     rmse_val = np.sqrt(mean_squared_error(Y_val, preds_val))
     rmse.append(rmse_val)
     r2_val = r2_score(Y_val, preds_val)
 
-    if  lags == 1 or lags == 3 or lags == 20 :
+
+
+
+
+
+
+
+    if  lags == 1 or lags == 10 or lags == 20  :
     
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), sharey=True)
         t_fit = np.arange(len(Y_fit))

@@ -14,25 +14,28 @@ u0= df['u1'].values #uk
 y0 = df['y1'].values
 
 
+
+#So here we're just creating our yk-1,uk-1yk-2, yk-2
+#we take y0,u0 and shift all the values by nth lag
+#We assume that the inital condition is constant so yk[0] = yk-1[0] = ...
+
 # Define how many lags you want to create
 max_lags = 10
 
-# Lists to hold your lagged arrays dynamically
+# Lists to hold lagged arrays dynamically
 y_lags = []
 u_lags = []
 
 # Temporary trackers starting with the original signals
-current_y = y0
-current_u = u0
 
-for i in range(max_lags):
-    # Shift Y: repeat the first element at the front, drop the last element
-    current_y = np.hstack([current_y[0], current_y])[:-1]
-    y_lags.append(current_y)
+# So we shift by one add the initial value as the first value and then remove the las value to keep the same dimensions
+for i in range(1,max_lags+1):
+
+     
+    y_lags.append(np.hstack([np.ones(i)*y0[0], y0[:-i]]))
     
-    # Shift U: repeat the first element at the front, drop the last element
-    current_u = np.hstack([current_u[0], current_u])[:-1]
-    u_lags.append(current_u)
+     
+    u_lags.append(np.hstack([np.ones(i)*u0[0], u0[:-i]]))
 
 
 
@@ -53,6 +56,7 @@ u1 = u_lags[0]
 y2 = y_lags[1]
 u2 = u_lags[1]
 
+# this is just an index to split in half
 y1_red = len(y1)//2
 u1_red = len(u1)//2
 y2_red = len(y2)//2
@@ -61,7 +65,10 @@ y0_red = len(u0)//2
 
 print(y1_red)
 
-#1 lag linear ARX model
+#linear ARX model
+#we split the data into a fitting nd validation set
+#For the validation data you dont pass the yk-n value it has to reconstruct it by itself 
+
 y1_fit = y1[0:y1_red]
 y1_val = y1[y1_red:]
 
@@ -74,10 +81,10 @@ u1_val = u1[u1_red:]
 u2_fit = u2[:u2_red]
 u2_val = u2[u2_red:]
 
-phi1_fit = np.column_stack((y1_fit, u1_fit**(1/2),u1_fit))
+phi1_fit = np.column_stack((y1_fit,u1_fit))
 #phi1_val = np.column_stack((y1_val, u1_val))
 
-phi2_fit = np.column_stack((y1_fit,y2_fit, u1_fit**(1/2),u1_fit, u2_fit))
+phi2_fit = np.column_stack((y1_fit,y2_fit,u1_fit, u2_fit))
 #phi2_val = np.column_stack((y1_val, y2_val, u1_val, u2_val))
 
 
@@ -88,6 +95,7 @@ Y_val = y0[y0_red:]
 print(np.shape(Y_fit))
 print(np.shape(phi1_fit))
 
+# So we here we fit the model
 
 ols_model1 = LinearRegression(fit_intercept=True)
 ols_model1.fit(phi1_fit, Y_fit)
@@ -97,9 +105,13 @@ ols_model2.fit(phi2_fit, Y_fit)
 
 
 ols_preds1_fit = ols_model1.predict(phi1_fit)
+
 ols_rmse1_fit = np.sqrt(mean_squared_error(Y_fit, ols_preds1_fit))
 ols_r21_fit = r2_score(Y_fit, ols_preds1_fit)
 
+
+
+# here we test the model on the validation set
 
 ols_preds1_val = np.zeros(len(Y_val))
 
@@ -108,12 +120,13 @@ ols_preds1_val[0] = Y_val[0]
 
 for k in range(1, len(Y_val)):
 
-    Xk = np.array([[ols_preds1_val[k-1],u1_val[k]**(1/2),u1_val[k]]])
+    # Same as before, we construct the phi matrix but this time the yk-1 values are predicted one by one with the model
+    Xk = np.array([[ols_preds1_val[k-1],u1_val[k-1]]]) 
 
     ols_preds1_val[k] = ols_model1.predict(Xk)[0]
 
 
-
+#same as before just for 2 lags
 
 ols_rmse1_val = np.sqrt(mean_squared_error(Y_val, ols_preds1_val))
 ols_r21_val = r2_score(Y_val, ols_preds1_val)
@@ -125,19 +138,27 @@ ols_rmse2_fit = np.sqrt(mean_squared_error(Y_fit, ols_preds2_fit))
 ols_r22_fit = r2_score(Y_fit, ols_preds2_fit)
 
 
+
 ols_preds2_val = np.zeros(len(Y_val))
 
 # initialize first two samples
 ols_preds2_val[0] = Y_val[0]
 ols_preds2_val[1] = Y_val[1]
 
+# The problem here is that we sart at 2 and we pass the true value of y_val as inital condition
+# this means that the model wont start predicting unitl after 2 setp (if n lag n step) 
+# and at the sart we will have a perfect fit (fit the noise too) 
+# this can become problematic with higher numbers of lags. 
+# if you zoom on the figure 2 at the sart you will see that it follows the noise
+# in  Regression.py  this is fixed (non_lin too)
+
 for k in range(2, len(Y_val)):
 
     Xk = np.array([[
         ols_preds2_val[k-1],
         ols_preds2_val[k-2],
-        u1_val[k]**(1/2),u1_val[k],
-        u2_val[k]
+        u1_val[k-1],
+        u2_val[k-2]
     ]])
 
     ols_preds2_val[k] = ols_model2.predict(Xk)[0]
@@ -151,7 +172,7 @@ ols_r22_val = r2_score(Y_val, ols_preds2_val)
 
 
 
-
+#graphs
 
 
 

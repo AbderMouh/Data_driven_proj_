@@ -18,6 +18,7 @@ t = df['time'].values
 u0 = df['u1'].values 
 y0 = df['y1'].values
 y_no_noise = df['y_no_noise'].values
+
 # Define the maximum number of lags to generate (Set to 6)
 max_lags = 25
 
@@ -25,20 +26,19 @@ max_lags = 25
 y_lags = []
 u_lags = []
 
-current_y = y0
-current_u = u0
-
-for i in range(max_lags):
-    current_y = np.hstack([current_y[0], current_y])[:-1]
-    y_lags.append(current_y)
-    
-    current_u = np.hstack([current_u[0], current_u])[:-1]
-    u_lags.append(current_u)
-
 # Half-splits for training and validation
 y0_red = len(y0) // 2
 Y_fit = y0[0:y0_red]
 Y_val = y0[y0_red:]
+
+# So we shift by one add the initial value as the first value and then remove the las value to keep the same dimensions
+for i in range(1,max_lags+1):
+
+    y_lags.append(np.hstack([np.ones(i)*y0[0], y0[:-i]]))
+
+    u_lags.append(np.hstack([np.ones(i)*u0[0], u0[:-i]]))
+
+
 
 # Slice validation inputs for recursive simulation loops
 u_val_matrix = np.column_stack([u[y0_red:] for u in u_lags])
@@ -46,8 +46,10 @@ u_val_matrix = np.column_stack([u[y0_red:] for u in u_lags])
 # Text box formatting for plot benchmarks
 props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 
-rmse =[]
-# --- Loop over 1, 2, 3, 4, 5, and 6 Lags Dynamically ---
+rmse =[] #list to store the root mean square error to plot it later
+
+
+# --- Loop over 1, 2, 3, ... lags
 for lags in range(1, max_lags + 1):
     
     # 1. Build Feature Matrix (phi) for Fit Phase
@@ -65,24 +67,39 @@ for lags in range(1, max_lags + 1):
     r2_fit = r2_score(Y_fit, preds_fit)
     
     # 4. Validation Phase Recursive Simulation Loop
+    # list that will contain all of our predicted y values
+    # since for each step we need all the past input we have to compute it incrementally 
+
     preds_val = np.zeros(len(Y_val))
-    preds_val[0:lags] = Y_val[0:lags] # Seed the loop with real initial history
     
-    for k in range(lags, len(Y_val)):
-        # Extract past outputs (from our own predictions)
-        y_features = [preds_val[k - i] for i in range(1, lags + 1)]
-        # Extract past inputs (from validation matrix)
-        u_features = [u_val_matrix[k, i] for i in range(lags)]
+    
+    for k in range(0, len(Y_val)):
+    
+        # Extract past outputs: if k - i < 0, it means it's before the start, so use Y_val[0]
+        y_features = [preds_val[k - i] if (k - i) >= 0 else Y_val[0] for i in range(1, lags + 1)]
         
-        Xk = np.array([y_features + u_features])
+        # Extract past inputs: do the same zero-padding if the index is out of bounds
+        u_features = [u_val_matrix[k, i] for i in range(lags)] 
+
+        # Combine into your final row vector [y_linear, u_linear, sqrt(y1)]
+        Xk = np.array([y_features + u_features ])
+        
+        # Predict step k
         preds_val[k] = model.predict(Xk)[0]
         
-    rmse_val = np.sqrt(mean_squared_error(Y_val, preds_val))
+
+        
+    rmse_val = np.sqrt(mean_squared_error(Y_val[lags:], preds_val[lags:]))
     rmse.append(rmse_val)
-    r2_val = r2_score(Y_val, preds_val)
+    r2_val = r2_score(Y_val[lags:], preds_val[lags:])
     
 
-    if  lags == 1 or lags == 3 or lags == 20 :
+
+
+
+
+
+    if  lags == 1 or lags == 3 or lags == 20 or lags == 90:
     
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), sharey=True)
         t_fit = np.arange(len(Y_fit))
@@ -111,6 +128,19 @@ for lags in range(1, max_lags + 1):
         text_val = f'Val RMSE: {rmse_val:.4f}\nVal R²: {r2_val:.4f}'
         ax2.text(0.02, 0.05, text_val, transform=ax2.transAxes, fontsize=10, verticalalignment='bottom', bbox=props)
         
+        
+
         plt.tight_layout()
 
+fig, ax3 = plt.subplots(figsize=(12, 8))
+
+# Plot the RMSE array against the number of lags
+
+ax3.plot(np.arange(1, len(rmse) + 1), rmse, label='Root Mean Square Error', color='blue', marker='.')
+
+ax3.set_title('Validation RMSE depending on the Number of Lags')
+ax3.set_xlabel('Number of Lags')
+ax3.set_ylabel('RMSE Value')
+ax3.grid(True)
+ax3.legend()
 plt.show()

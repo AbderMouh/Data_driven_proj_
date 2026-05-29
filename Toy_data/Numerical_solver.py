@@ -9,32 +9,49 @@ from scipy.interpolate import interp1d
 # 1. Load CSV and Create Interpolation Function for q_in(t)
 # =====================================================================
 
-# # --- SCENARIO A: Your CSV has two columns: [time, q_in] ---
-df = pd.read_csv('./Real_data/dataBenchmark.csv') # je vole l'input du real dataset >:D
-q_data = df['uEst'].values * 0.002  # Pour avoir des valeur realiste en m3/s vu que de base c est en volt
-dt = 4/1024    
-                                      # Adjust this to your actual time increment
-t_data = np.arange(len(q_data)) * dt                 # Creates time array from 0 to 102.3 seconds
 
 
-# # Your time configuration
-# dt = 15 / 1024  # Time increment per sample (~0.0039 seconds)
+a = "sine"
 
-# # Define the custom sequence of steps you want (similar to the image)
-# # You can change these numbers to match whatever levels you want to test
-# step_levels = [0.004, 0.015, 0.001,0.010,0.006]
+if a == "sine":
 
-# # Define how long each plateau should last (in seconds)
-# seconds_per_step = 5
+    S = 0.020 # surface de rayon 8 cm +-
+    c = 0.02 # Valve/discharge constant
+    h0 = 0.08 # Initial tank height at t = 0
 
-# # Calculate how many data points are needed to fill that time duration
-# samples_per_step = int(seconds_per_step / dt)
 
-# # Generate q_data by repeating each level for the calculated number of samples
-# q_data = np.repeat(step_levels, samples_per_step)
+    df = pd.read_csv('./Real_data/dataBenchmark.csv') # je vole l'input du real dataset >:D
+    q_data = df['uEst'].values * 0.002  # Pour avoir des valeur realiste en m3/s vu que de base c est en volt
+    dt = 4/1024    
+                                        # Adjust this to your actual time increment
+    t_data = np.arange(len(q_data)) * dt                 
 
-# # Generate the corresponding time array matching the length of q_data
-# t_data = np.arange(len(q_data)) * dt
+if a == "step":
+
+    S = 0.020 # surface de rayon 8 cm +-
+    c = 0.045# Valve/discharge constant
+    h0 = 0.08  # Initial tank height at t = 0
+
+    # Your time configuration
+    dt = 4/ 1024  
+
+    # Define the custom sequence of steps you want (similar to the image)
+    # You can change these numbers to match whatever levels you want to test
+    step_levels = [0.004, 0.015, 0.001,0.010,0.006]
+
+    # Define how long each plateau should last (in seconds)
+    seconds_per_step = 5
+
+    # Calculate how many data points are needed to fill that time duration
+    samples_per_step = int(seconds_per_step / dt)
+
+    # Generate q_data by repeating each level for the calculated number of samples
+    q_data = np.repeat(step_levels, samples_per_step)
+
+    # Generate the corresponding time array matching the length of q_data
+    t_data = np.arange(len(q_data)) * dt
+
+    
 
 
 
@@ -42,13 +59,18 @@ t_data = np.arange(len(q_data)) * dt                 # Creates time array from 0
 # # 'bounds_error=False, fill_value="extrapolate"' prevents crashing if the solver looks slightly past your data
 q_in_lookup = interp1d(t_data, q_data, kind='linear', bounds_error=False, fill_value="extrapolate")
 
+  
+
+
+
+
+
 
 # =====================================================================
 # 2. Define System Parameters and Differential Equation
 # =====================================================================
-S = 0.020 # surface de rayon 8 cm +-
-c = 0.02# Valve/discharge constant
-h0 = 0.08  # Initial tank height at t = 0
+
+
 
 def tank_system(t, h):
     h_val = max(h[0], 0.0)  # Safeguard against negative heights due to numerical overshoot
@@ -73,7 +95,7 @@ solution = solve_ivp(tank_system, t_span, [h0], t_eval=t_data)
 
 
 
-noise = np.random.normal(loc=0, scale=0.005, size=solution.y[0].shape)
+noise = np.random.normal(loc=0, scale=0.002, size=solution.y[0].shape)
 
 
 noisy = solution.y[0] + noise
